@@ -9,11 +9,7 @@ import { getCheckpoints } from '../utils/checkpointManagement';
 import type { CheckpointStatus, Key } from '../types';
 
 export function KeySystem() {
-  const [checkpoints, setCheckpoints] = useState<CheckpointStatus>({
-    checkpoint1: false,
-    checkpoint2: false,
-    checkpoint3: false,
-  });
+  const [checkpoints, setCheckpoints] = useState<CheckpointStatus>(getCheckpoints());
   const [generatedKey, setGeneratedKey] = useState<Key | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,15 +18,11 @@ export function KeySystem() {
   useEffect(() => {
     const initializeSystem = async () => {
       try {
-        // Check for existing valid key
         const existingKey = await getExistingValidKey();
         if (existingKey) {
           setGeneratedKey(existingKey);
         }
-
-        // Load saved checkpoints
-        const savedCheckpoints = getCheckpoints();
-        setCheckpoints(savedCheckpoints);
+        setCheckpoints(getCheckpoints());
       } catch (e) {
         console.error('Error initializing system:', e);
       } finally {
@@ -43,16 +35,15 @@ export function KeySystem() {
     // Start key validity check
     const cleanup = startKeyValidityCheck();
 
-    // Add storage event listener
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'checkpoints' && e.newValue) {
-        setCheckpoints(JSON.parse(e.newValue));
-      }
+    // Listen for checkpoint updates
+    const handleCheckpointUpdate = () => {
+      setCheckpoints(getCheckpoints());
     };
 
-    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('checkpointsUpdated', handleCheckpointUpdate);
+
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('checkpointsUpdated', handleCheckpointUpdate);
       cleanup();
     };
   }, []);
@@ -79,11 +70,7 @@ export function KeySystem() {
   };
 
   const handleGenerateKey = async () => {
-    if (
-      !checkpoints.checkpoint1 ||
-      !checkpoints.checkpoint2 ||
-      !checkpoints.checkpoint3
-    ) {
+    if (!checkpoints.checkpoint1 || !checkpoints.checkpoint2 || !checkpoints.checkpoint3) {
       setError('Please complete all checkpoints first');
       return;
     }
@@ -111,10 +98,7 @@ export function KeySystem() {
   }
 
   const currentCheckpoint = getCurrentCheckpoint();
-  const allCheckpointsCompleted =
-    checkpoints.checkpoint1 &&
-    checkpoints.checkpoint2 &&
-    checkpoints.checkpoint3;
+  const allCheckpointsCompleted = checkpoints.checkpoint1 && checkpoints.checkpoint2 && checkpoints.checkpoint3;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">

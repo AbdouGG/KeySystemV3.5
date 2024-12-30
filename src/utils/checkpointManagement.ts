@@ -8,23 +8,23 @@ const DEFAULT_CHECKPOINTS: CheckpointStatus = {
 
 export const resetCheckpoints = (): void => {
   localStorage.setItem('checkpoints', JSON.stringify(DEFAULT_CHECKPOINTS));
-  // Dispatch storage event to update other tabs
-  window.dispatchEvent(new StorageEvent('storage', {
-    key: 'checkpoints',
-    newValue: JSON.stringify(DEFAULT_CHECKPOINTS)
-  }));
+  window.dispatchEvent(new Event('checkpointsUpdated'));
 };
 
 export const getCheckpoints = (): CheckpointStatus => {
   const savedCheckpoints = localStorage.getItem('checkpoints');
-  return savedCheckpoints ? JSON.parse(savedCheckpoints) : DEFAULT_CHECKPOINTS;
+  if (!savedCheckpoints) {
+    localStorage.setItem('checkpoints', JSON.stringify(DEFAULT_CHECKPOINTS));
+    return DEFAULT_CHECKPOINTS;
+  }
+  return JSON.parse(savedCheckpoints);
 };
 
 export const completeCheckpoint = (checkpointNumber: number): void => {
   const currentCheckpoints = getCheckpoints();
   const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
   
-  // Only update if previous checkpoints are completed
+  // Only update if previous checkpoints are completed or it's the first checkpoint
   if (
     checkpointNumber === 1 ||
     (checkpointNumber === 2 && currentCheckpoints.checkpoint1) ||
@@ -36,10 +36,6 @@ export const completeCheckpoint = (checkpointNumber: number): void => {
     };
     
     localStorage.setItem('checkpoints', JSON.stringify(updatedCheckpoints));
-    // Dispatch storage event to update other tabs
-    window.dispatchEvent(new StorageEvent('storage', {
-      key: 'checkpoints',
-      newValue: JSON.stringify(updatedCheckpoints)
-    }));
+    window.dispatchEvent(new Event('checkpointsUpdated'));
   }
 };
