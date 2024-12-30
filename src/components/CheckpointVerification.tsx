@@ -9,31 +9,37 @@ export function CheckpointVerification() {
     const completeCheckpoint = async () => {
       try {
         // Get existing checkpoints
-        const savedCheckpoints = localStorage.getItem('checkpoints');
-        const checkpoints = savedCheckpoints ? JSON.parse(savedCheckpoints) : {
+        const savedCheckpoints = localStorage.getItem('checkpoints') || JSON.stringify({
           checkpoint1: false,
           checkpoint2: false,
           checkpoint3: false,
-        };
+        });
+        
+        const checkpoints = JSON.parse(savedCheckpoints);
 
         // Validate checkpoint number
         if (number && ['1', '2', '3'].includes(number)) {
           // Update the current checkpoint
           const checkpointKey = `checkpoint${number}` as keyof typeof checkpoints;
-          
+
           // Only update if previous checkpoints are completed
-          if (number === '1' || 
-              (number === '2' && checkpoints.checkpoint1) || 
-              (number === '3' && checkpoints.checkpoint1 && checkpoints.checkpoint2)) {
+          if (
+            number === '1' ||
+            (number === '2' && checkpoints.checkpoint1) ||
+            (number === '3' && checkpoints.checkpoint1 && checkpoints.checkpoint2)
+          ) {
             checkpoints[checkpointKey] = true;
-            
-            // Save updated checkpoints
+
+            // Save updated checkpoints immediately
             localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
+
+            // Force reload the main page to update the state
+            setTimeout(() => {
+              navigate('/', { replace: true });
+              window.location.reload();
+            }, 1500);
           }
         }
-
-        // Redirect back to main page after a short delay
-        setTimeout(() => navigate('/'), 1500);
       } catch (error) {
         console.error('Error completing checkpoint:', error);
       }
@@ -45,7 +51,9 @@ export function CheckpointVerification() {
   return (
     <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-2xl font-bold mb-4">Verifying Checkpoint {number}</h1>
+        <h1 className="text-2xl font-bold mb-4">
+          Verifying Checkpoint {number}
+        </h1>
         <p>Please wait while we verify your completion...</p>
       </div>
     </div>

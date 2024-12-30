@@ -41,24 +41,17 @@ export function KeySystem() {
     };
 
     initializeSystem();
+
+    // Add storage event listener
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'checkpoints' && e.newValue) {
+        setCheckpoints(JSON.parse(e.newValue));
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
-  }, [checkpoints]);
-
-  const generateKeyForUser = async () => {
-    try {
-      setIsProcessing(true);
-      setError(null);
-      const key = await generateKey();
-      setGeneratedKey(key);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate key');
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const getCurrentCheckpoint = () => {
     if (!checkpoints.checkpoint1) return 1;
@@ -70,32 +63,47 @@ export function KeySystem() {
   const handleLinkvertiseClick = async () => {
     const currentCheckpoint = getCurrentCheckpoint();
     try {
+      setIsProcessing(true);
       const checkpointUrl = await getCheckpointUrl(currentCheckpoint);
       window.open(checkpointUrl, '_blank');
     } catch (error) {
       console.error('Error handling checkpoint:', error);
       setError('Error processing checkpoint');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const currentCheckpoint = getCurrentCheckpoint();
-  const allCheckpointsCompleted = 
-    checkpoints.checkpoint1 && 
-    checkpoints.checkpoint2 && 
-    checkpoints.checkpoint3;
+  const handleGenerateKey = async () => {
+    if (!checkpoints.checkpoint1 || !checkpoints.checkpoint2 || !checkpoints.checkpoint3) {
+      setError('Please complete all checkpoints first');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      setError(null);
+      const key = await generateKey();
+      setGeneratedKey(key);
+    } catch (error: any) {
+      setError(error.message || 'Error generating key');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <div className="text-center">
-          <div className="inline-block p-3 rounded-full bg-red-500 mb-4 animate-pulse">
-            <Shield className="w-8 h-8 text-white" />
-          </div>
-          <p className="text-gray-400">Loading...</p>
+          <p>Loading...</p>
         </div>
       </div>
     );
   }
+
+  const currentCheckpoint = getCurrentCheckpoint();
+  const allCheckpointsCompleted = checkpoints.checkpoint1 && checkpoints.checkpoint2 && checkpoints.checkpoint3;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -105,11 +113,11 @@ export function KeySystem() {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-red-500 mb-2">Key System</h1>
-          <p className="text-gray-400">
-            {allCheckpointsCompleted 
-              ? "All checkpoints completed!" 
-              : `Checkpoint: ${currentCheckpoint} / 3`}
-          </p>
+          {allCheckpointsCompleted ? (
+            <p className="text-green-400">All checkpoints completed!</p>
+          ) : (
+            <p className="text-gray-400">Checkpoint: {currentCheckpoint} / 3</p>
+          )}
         </div>
 
         {error && (
@@ -131,15 +139,13 @@ export function KeySystem() {
                     />
                   </div>
                 ) : (
-                  <div className="flex justify-center">
-                    <button
-                      onClick={generateKeyForUser}
-                      disabled={isProcessing}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {isProcessing ? 'Generating key...' : 'Generate Key'}
-                    </button>
-                  </div>
+                  <button
+                    onClick={handleGenerateKey}
+                    disabled={isProcessing}
+                    className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isProcessing ? 'Generating...' : 'Generate Key'}
+                  </button>
                 )}
                 <div className="flex justify-center">
                   <button
