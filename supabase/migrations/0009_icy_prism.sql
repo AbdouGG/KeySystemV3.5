@@ -1,45 +1,44 @@
 /*
-  # Update key deletion trigger with delay
+  # Fix key deletion timeout issue
   
   1. Changes
-    - Add 10-second delay before deleting expired keys
-    - Update trigger function to include delay
-    - Update manual cleanup function to include delay
+    - Remove pg_sleep that was causing timeouts
+    - Implement a more reliable deletion approach
+    - Add grace period using timestamp comparison
   
   2. Details
-    - Uses pg_sleep(10) to add a 10-second delay
-    - Maintains existing functionality but adds delay
-    - Applies to both trigger and manual cleanup
+    - Uses timestamp comparison instead of sleep
+    - Adds 10 second buffer to expiration check
+    - More reliable and won't cause timeouts
 */
 
--- Drop existing trigger if it exists
+-- Drop existing trigger and function
 DROP TRIGGER IF EXISTS delete_expired_keys_trigger ON keys;
+DROP FUNCTION IF EXISTS delete_expired_keys_trigger_fn();
+DROP FUNCTION IF EXISTS clean_expired_keys();
 
--- Create or replace the trigger function with delay
-CREATE OR REPLACE FUNCTION delete_expired_keys_trigger_fn()
+-- Create new function for expired key deletion with grace period
+CREATE OR REPLACE FUNCTION delete_expired_keys_with_grace()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Schedule deletion after 10 seconds
-  PERFORM pg_sleep(10);
+  -- Delete keys that have been expired for more than 10 seconds
   DELETE FROM keys 
-  WHERE expires_at < NOW();
+  WHERE expires_at < (NOW() - INTERVAL '10 seconds');
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
--- Create the trigger
+-- Create new trigger
 CREATE TRIGGER delete_expired_keys_trigger
   AFTER INSERT OR UPDATE ON keys
   FOR EACH STATEMENT
-  EXECUTE FUNCTION delete_expired_keys_trigger_fn();
+  EXECUTE FUNCTION delete_expired_keys_with_grace();
 
--- Function to manually clean expired keys with delay
+-- Function for manual cleanup
 CREATE OR REPLACE FUNCTION clean_expired_keys()
 RETURNS void AS $$
 BEGIN
-  -- Add 10-second delay before deletion
-  PERFORM pg_sleep(10);
   DELETE FROM keys 
-  WHERE expires_at < NOW();
+  WHERE expires_at < (NOW() - INTERVAL '10 seconds');
 END;
 $$ LANGUAGE plpgsql;
