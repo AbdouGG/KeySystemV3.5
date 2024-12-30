@@ -1,12 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
-import { addHours } from 'date-fns';
+import { addSeconds } from 'date-fns';
 import { supabase } from '../config/supabase';
 import { getHWID } from './hwid';
+import { resetCheckpoints } from './checkpointManagement';
 
 export const generateKey = async () => {
   const key = uuidv4();
   const now = new Date();
-  const expiresAt = addHours(now, 24);
+  const expiresAt = addSeconds(now, 30); // Changed to 30 seconds
   const hwid = getHWID();
 
   // Check if there's an existing valid key for this HWID
