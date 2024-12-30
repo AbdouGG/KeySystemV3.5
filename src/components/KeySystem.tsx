@@ -30,7 +30,30 @@ export function KeySystem() {
 
   useEffect(() => {
     localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
+    
+    // Check if all checkpoints are completed and generate key
+    const allCheckpointsCompleted = 
+      checkpoints.checkpoint1 && 
+      checkpoints.checkpoint2 && 
+      checkpoints.checkpoint3;
+
+    if (allCheckpointsCompleted && !generatedKey) {
+      generateKeyForUser();
+    }
   }, [checkpoints]);
+
+  const generateKeyForUser = async () => {
+    try {
+      setIsProcessing(true);
+      setError(null);
+      const key = await generateKey();
+      setGeneratedKey(key);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate key');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const getCurrentCheckpoint = () => {
     if (!checkpoints.checkpoint1) return 1;
@@ -51,6 +74,10 @@ export function KeySystem() {
   };
 
   const currentCheckpoint = getCurrentCheckpoint();
+  const allCheckpointsCompleted = 
+    checkpoints.checkpoint1 && 
+    checkpoints.checkpoint2 && 
+    checkpoints.checkpoint3;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -60,7 +87,11 @@ export function KeySystem() {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-red-500 mb-2">Key System</h1>
-          <p className="text-gray-400">Checkpoint: {currentCheckpoint} / 3</p>
+          <p className="text-gray-400">
+            {allCheckpointsCompleted 
+              ? "All checkpoints completed!" 
+              : `Checkpoint: ${currentCheckpoint} / 3`}
+          </p>
         </div>
 
         {error && (
@@ -73,13 +104,25 @@ export function KeySystem() {
           <div className="space-y-4">
             <div className="bg-gray-800 p-6 rounded-lg shadow-xl">
               <div className="space-y-4">
-                <div className="flex justify-center">
-                  <CheckpointButton
-                    currentCheckpoint={currentCheckpoint}
-                    onClick={handleLinkvertiseClick}
-                    disabled={isProcessing}
-                  />
-                </div>
+                {!allCheckpointsCompleted ? (
+                  <div className="flex justify-center">
+                    <CheckpointButton
+                      currentCheckpoint={currentCheckpoint}
+                      onClick={handleLinkvertiseClick}
+                      disabled={isProcessing}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex justify-center">
+                    <button
+                      onClick={generateKeyForUser}
+                      disabled={isProcessing}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isProcessing ? 'Generating key...' : 'Generate Key'}
+                    </button>
+                  </div>
+                )}
                 <div className="flex justify-center">
                   <button
                     className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg transition-colors opacity-50 cursor-not-allowed"
