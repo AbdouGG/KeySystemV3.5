@@ -1,19 +1,40 @@
-import { supabase } from '../config/supabase';
+import React, { useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { completeCheckpoint } from '../utils/checkpointManagement';
 
-export const verifyCheckpoint = async (checkpointNumber: number): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase
-      .from('checkpoint_verifications')
-      .select('verified')
-      .eq('checkpoint_number', checkpointNumber)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+export function CheckpointVerification() {
+  const { number } = useParams();
+  const navigate = useNavigate();
 
-    if (error) throw error;
-    return data?.verified || false;
-  } catch (error) {
-    console.error('Error verifying checkpoint:', error);
-    return false;
-  }
-};
+  useEffect(() => {
+    const verifyCheckpoint = async () => {
+      try {
+        // Validate checkpoint number
+        if (number && ['1', '2', '3'].includes(number)) {
+          // Complete the checkpoint
+          completeCheckpoint(parseInt(number));
+
+          // Navigate back to main page
+          setTimeout(() => {
+            navigate('/', { replace: true });
+          }, 1500);
+        }
+      } catch (error) {
+        console.error('Error verifying checkpoint:', error);
+      }
+    };
+
+    verifyCheckpoint();
+  }, [number, navigate]);
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold mb-4">
+          Verifying Checkpoint {number}
+        </h1>
+        <p>Please wait while we verify your completion...</p>
+      </div>
+    </div>
+  );
+}
