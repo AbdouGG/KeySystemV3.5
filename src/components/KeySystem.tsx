@@ -3,6 +3,7 @@ import { Shield } from 'lucide-react';
 import { KeyDisplay } from './KeyDisplay';
 import { CheckpointButton } from './CheckpointButton';
 import { generateKey } from '../utils/keyGeneration';
+import { getExistingValidKey } from '../utils/keyManagement';
 import { getCheckpointUrl } from '../utils/checkpointUrls';
 import type { CheckpointStatus, Key } from '../types';
 
@@ -15,31 +16,35 @@ export function KeySystem() {
   const [generatedKey, setGeneratedKey] = useState<Key | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedCheckpoints = localStorage.getItem('checkpoints');
-    if (savedCheckpoints) {
+    const initializeSystem = async () => {
       try {
-        const parsed = JSON.parse(savedCheckpoints);
-        setCheckpoints(parsed);
+        // Check for existing valid key
+        const existingKey = await getExistingValidKey();
+        if (existingKey) {
+          setGeneratedKey(existingKey);
+        }
+
+        // Load saved checkpoints
+        const savedCheckpoints = localStorage.getItem('checkpoints');
+        if (savedCheckpoints) {
+          const parsed = JSON.parse(savedCheckpoints);
+          setCheckpoints(parsed);
+        }
       } catch (e) {
-        console.error('Error parsing saved checkpoints:', e);
+        console.error('Error initializing system:', e);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    initializeSystem();
   }, []);
 
   useEffect(() => {
     localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
-    
-    // Check if all checkpoints are completed and generate key
-    const allCheckpointsCompleted = 
-      checkpoints.checkpoint1 && 
-      checkpoints.checkpoint2 && 
-      checkpoints.checkpoint3;
-
-    if (allCheckpointsCompleted && !generatedKey) {
-      generateKeyForUser();
-    }
   }, [checkpoints]);
 
   const generateKeyForUser = async () => {
@@ -78,6 +83,19 @@ export function KeySystem() {
     checkpoints.checkpoint1 && 
     checkpoints.checkpoint2 && 
     checkpoints.checkpoint3;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block p-3 rounded-full bg-red-500 mb-4 animate-pulse">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
