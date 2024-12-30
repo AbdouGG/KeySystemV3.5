@@ -1,6 +1,7 @@
 import { supabase } from '../config/supabase';
 import { resetCheckpoints } from './checkpointManagement';
 import { getHWID } from './hwid';
+import { deleteExpiredKey } from './keyDeletion';
 
 export const checkKeyExpiration = async (): Promise<boolean> => {
   const hwid = getHWID();
@@ -30,6 +31,14 @@ export const checkKeyExpiration = async (): Promise<boolean> => {
     if (!mostRecentValidKey && mostRecentExpiredKey) {
       resetCheckpoints();
       localStorage.removeItem('had_valid_key');
+      
+      // Schedule deletion of expired key after 2 seconds
+      if (mostRecentExpiredKey.id) {
+        setTimeout(() => {
+          deleteExpiredKey(mostRecentExpiredKey.id);
+        }, 2000);
+      }
+      
       return true;
     }
 
