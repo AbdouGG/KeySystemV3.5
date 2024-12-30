@@ -11,9 +11,26 @@ export const resetCheckpoints = () => {
 };
 
 export const getCheckpoints = (): CheckpointStatus => {
-  const savedCheckpoints = localStorage.getItem('checkpoints');
-  if (savedCheckpoints) {
-    return JSON.parse(savedCheckpoints);
+  try {
+    const savedCheckpoints = localStorage.getItem('checkpoints');
+    if (savedCheckpoints) {
+      const parsed = JSON.parse(savedCheckpoints);
+      // Validate the structure
+      if (
+        typeof parsed === 'object' &&
+        'checkpoint1' in parsed &&
+        'checkpoint2' in parsed &&
+        'checkpoint3' in parsed
+      ) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing checkpoints:', error);
   }
   return resetCheckpoints();
+};
+
+export const saveCheckpoints = (checkpoints: CheckpointStatus): void => {
+  localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
 };

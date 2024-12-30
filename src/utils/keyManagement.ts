@@ -6,10 +6,10 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
   try {
     const hwid = getHWID();
     const now = new Date().toISOString();
-    
+
     const { data, error } = await supabase
       .from('keys')
-      .select('*')
+      .select()
       .eq('hwid', hwid)
       .eq('is_valid', true)
       .gte('expires_at', now)
@@ -17,7 +17,10 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       .limit(1)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error('Error fetching existing key:', error);
