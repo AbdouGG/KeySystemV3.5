@@ -1,37 +1,44 @@
 /*
-  # Automatic Key Deletion System
+  # Add delayed key deletion trigger
   
-  1. New Functions
-    - `clean_expired_keys()`: Function to delete expired keys
-    - `handle_expired_key()`: Trigger function to handle key expiration
-    
-  2. New Triggers
-    - Trigger that runs on SELECT/UPDATE to automatically handle expired keys
+  1. Changes
+    - Creates a trigger function with 10-second delay before deleting expired keys
+    - Adds trigger to automatically delete expired keys after delay
+    - Updates clean_expired_keys function to include delay
+  
+  2. Security
+    - No RLS changes needed
+    - Functions execute with invoker's privileges
 */
 
--- Function to clean expired keys
+-- Drop existing trigger if it exists
+DROP TRIGGER IF EXISTS delete_expired_keys_trigger ON keys;
+
+-- Create or replace the trigger function with delay
+CREATE OR REPLACE FUNCTION delete_expired_keys_trigger_fn()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Schedule deletion after 10 seconds
+  PERFORM pg_sleep(10);
+  DELETE FROM keys 
+  WHERE expires_at < NOW();
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger
+CREATE TRIGGER delete_expired_keys_trigger
+  AFTER INSERT OR UPDATE ON keys
+  FOR EACH STATEMENT
+  EXECUTE FUNCTION delete_expired_keys_trigger_fn();
+
+-- Function to manually clean expired keys with delay
 CREATE OR REPLACE FUNCTION clean_expired_keys()
 RETURNS void AS $$
 BEGIN
+  -- Add 10-second delay before deletion
+  PERFORM pg_sleep(10);
   DELETE FROM keys 
   WHERE expires_at < NOW();
 END;
 $$ LANGUAGE plpgsql;
-
--- Trigger function to handle expired keys
-CREATE OR REPLACE FUNCTION handle_expired_key()
-RETURNS TRIGGER AS $$
-BEGIN
-  IF NEW.expires_at < NOW() THEN
-    DELETE FROM keys WHERE id = NEW.id;
-    RETURN NULL;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Create trigger for automatic deletion
-CREATE TRIGGER auto_delete_expired_key
-  BEFORE UPDATE OR SELECT ON keys
-  FOR EACH ROW
-  EXECUTE FUNCTION handle_expired_key();

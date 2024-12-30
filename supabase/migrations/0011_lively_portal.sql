@@ -1,70 +1,44 @@
 /*
-  # Fix delayed key deletion
+  # Add delayed key deletion trigger
   
   1. Changes
-    - Creates a new column to track deletion time
-    - Adds row-level trigger to mark keys for deletion
-    - Creates function to handle actual deletion after delay
+    - Creates a trigger function with 10-second delay before deleting expired keys
+    - Adds trigger to automatically delete expired keys after delay
+    - Updates clean_expired_keys function to include delay
   
   2. Security
-    - Maintains existing RLS policies
-    - Functions execute with security definer
+    - No RLS changes needed
+    - Functions execute with invoker's privileges
 */
 
--- Add column to track when key should be deleted
-ALTER TABLE keys ADD COLUMN IF NOT EXISTS delete_at timestamptz;
-
--- Drop existing triggers
+-- Drop existing trigger if it exists
 DROP TRIGGER IF EXISTS delete_expired_keys_trigger ON keys;
-DROP TRIGGER IF EXISTS auto_delete_expired_key ON keys;
 
--- Create function to mark keys for deletion
-CREATE OR REPLACE FUNCTION mark_key_for_deletion()
+-- Create or replace the trigger function with delay
+CREATE OR REPLACE FUNCTION delete_expired_keys_trigger_fn()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.expires_at < NOW() AND NEW.is_valid = true THEN
-    NEW.is_valid := false;
-    NEW.delete_at := NOW() + INTERVAL '10 seconds';
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Create function to perform actual deletion
-CREATE OR REPLACE FUNCTION perform_delayed_deletion()
-RETURNS TRIGGER AS $$
-BEGIN
+  -- Schedule deletion after 10 seconds
+  PERFORM pg_sleep(10);
   DELETE FROM keys 
-  WHERE delete_at IS NOT NULL 
-    AND delete_at <= NOW();
+  WHERE expires_at < NOW();
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
--- Create row-level trigger for marking keys
-CREATE TRIGGER mark_expired_key_for_deletion
-  BEFORE UPDATE OR INSERT ON keys
-  FOR EACH ROW
-  EXECUTE FUNCTION mark_key_for_deletion();
-
--- Create statement-level trigger for deletion
-CREATE TRIGGER perform_delayed_key_deletion
-  AFTER UPDATE OR INSERT ON keys
+-- Create the trigger
+CREATE TRIGGER delete_expired_keys_trigger
+  AFTER INSERT OR UPDATE ON keys
   FOR EACH STATEMENT
-  EXECUTE FUNCTION perform_delayed_deletion();
+  EXECUTE FUNCTION delete_expired_keys_trigger_fn();
 
--- Function to manually clean expired keys
+-- Function to manually clean expired keys with delay
 CREATE OR REPLACE FUNCTION clean_expired_keys()
 RETURNS void AS $$
 BEGIN
-  UPDATE keys 
-  SET is_valid = false,
-      delete_at = NOW() + INTERVAL '10 seconds'
-  WHERE expires_at < NOW() 
-    AND is_valid = true;
-    
+  -- Add 10-second delay before deletion
+  PERFORM pg_sleep(10);
   DELETE FROM keys 
-  WHERE delete_at IS NOT NULL 
-    AND delete_at <= NOW();
+  WHERE expires_at < NOW();
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
