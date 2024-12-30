@@ -7,7 +7,7 @@ export const checkKeyExpiration = async (): Promise<boolean> => {
   const now = new Date().toISOString();
 
   try {
-    // Get all expired keys for this HWID
+    // Check if the current key is expired
     const { data: keys, error } = await supabase
       .from('keys')
       .select('*')
@@ -17,23 +17,10 @@ export const checkKeyExpiration = async (): Promise<boolean> => {
 
     if (error) throw error;
 
-    // Handle expired keys
+    // If we found expired keys, reset local state
     if (keys && keys.length > 0) {
-      // Reset local checkpoints
       resetCheckpoints();
       localStorage.removeItem('had_valid_key');
-
-      // Delete expired keys directly from Supabase
-      const { error: deleteError } = await supabase
-        .from('keys')
-        .delete()
-        .in('id', keys.map(key => key.id));
-
-      if (deleteError) {
-        console.error('Error deleting expired keys:', deleteError);
-        return false;
-      }
-
       return true;
     }
 
