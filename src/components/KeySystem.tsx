@@ -18,19 +18,14 @@ export function KeySystem() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const checkKeyValidity = async () => {
-    const existingKey = await getExistingValidKey();
-    if (existingKey) {
-      setGeneratedKey(existingKey);
-    } else {
-      setGeneratedKey(null);
-    }
-  };
-
   useEffect(() => {
     const initializeSystem = async () => {
       try {
-        await checkKeyValidity();
+        // Check for existing valid key
+        const existingKey = await getExistingValidKey();
+        if (existingKey) {
+          setGeneratedKey(existingKey);
+        }
 
         // Load saved checkpoints
         const savedCheckpoints = localStorage.getItem('checkpoints');
@@ -54,14 +49,8 @@ export function KeySystem() {
       }
     };
 
-    // Set up interval to check key validity every 5 seconds
-    const intervalId = setInterval(checkKeyValidity, 5000);
-
     window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(intervalId);
-    };
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const getCurrentCheckpoint = () => {

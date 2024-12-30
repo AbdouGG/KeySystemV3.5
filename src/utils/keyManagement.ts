@@ -17,26 +17,10 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       .limit(1)
       .single();
 
-    if (error) {
-      // If no valid key found, reset checkpoints
-      resetCheckpoints();
-      return null;
-    }
-    
+    if (error) throw error;
     return data;
   } catch (error) {
     console.error('Error fetching existing key:', error);
-    // Reset checkpoints on error
-    resetCheckpoints();
     return null;
   }
-};
-
-export const resetCheckpoints = () => {
-  const defaultCheckpoints = {
-    checkpoint1: false,
-    checkpoint2: false,
-    checkpoint3: false,
-  };
-  localStorage.setItem('checkpoints', JSON.stringify(defaultCheckpoints));
 };
