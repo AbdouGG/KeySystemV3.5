@@ -5,7 +5,6 @@ import { CheckpointButton } from './CheckpointButton';
 import { generateKey } from '../utils/keyGeneration';
 import { getExistingValidKey } from '../utils/keyManagement';
 import { getCheckpointUrl } from '../utils/checkpointUrls';
-import { getCheckpoints, resetCheckpoints } from '../utils/checkpointManagement';
 import type { CheckpointStatus, Key } from '../types';
 
 export function KeySystem() {
@@ -26,22 +25,13 @@ export function KeySystem() {
         const existingKey = await getExistingValidKey();
         if (existingKey) {
           setGeneratedKey(existingKey);
-          // Check if key is expired
-          if (new Date(existingKey.expires_at) <= new Date()) {
-            setGeneratedKey(null);
-            const resetStatus = resetCheckpoints();
-            setCheckpoints(resetStatus);
-          }
-        } else {
-          // If no valid key exists, ensure checkpoints are reset
-          const resetStatus = resetCheckpoints();
-          setCheckpoints(resetStatus);
         }
 
-        // Load saved checkpoints only if we have a valid key
-        if (existingKey && new Date(existingKey.expires_at) > new Date()) {
-          const savedCheckpoints = getCheckpoints();
-          setCheckpoints(savedCheckpoints);
+        // Load saved checkpoints
+        const savedCheckpoints = localStorage.getItem('checkpoints');
+        if (savedCheckpoints) {
+          const parsed = JSON.parse(savedCheckpoints);
+          setCheckpoints(parsed);
         }
       } catch (e) {
         console.error('Error initializing system:', e);
@@ -52,16 +42,6 @@ export function KeySystem() {
 
     initializeSystem();
 
-    // Set up periodic check for key expiration
-    const checkKeyExpiration = setInterval(async () => {
-      const currentKey = await getExistingValidKey();
-      if (!currentKey && generatedKey) {
-        setGeneratedKey(null);
-        const resetStatus = resetCheckpoints();
-        setCheckpoints(resetStatus);
-      }
-    }, 1000); // Check every second
-
     // Add storage event listener
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'checkpoints' && e.newValue) {
@@ -70,11 +50,8 @@ export function KeySystem() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkKeyExpiration);
-    };
-  }, [generatedKey]);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const getCurrentCheckpoint = () => {
     if (!checkpoints.checkpoint1) return 1;
