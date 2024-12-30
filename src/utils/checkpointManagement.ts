@@ -1,67 +1,39 @@
-import { CheckpointStatus } from '../types';
+import { PersistentStorage } from './storage/persistentStorage';
+import type { CheckpointStatus } from '../types';
 
-const DEFAULT_CHECKPOINTS: CheckpointStatus = {
-  checkpoint1: false,
-  checkpoint2: false,
-  checkpoint3: false,
+const storage = PersistentStorage.getInstance();
+
+export const initializeCheckpoints = async () => {
+  await storage.initialize();
 };
 
-// Debug function to log checkpoint operations
-const logCheckpointOperation = (operation: string, data: any) => {
-  console.log(`[Checkpoint ${operation}]:`, data);
-};
-
-export const resetCheckpoints = (): void => {
-  logCheckpointOperation('reset', 'Resetting all checkpoints');
-  localStorage.setItem('checkpoints', JSON.stringify(DEFAULT_CHECKPOINTS));
-  window.dispatchEvent(new Event('checkpointsUpdated'));
-};
-
-export const getCheckpoints = (): CheckpointStatus => {
-  const savedCheckpoints = localStorage.getItem('checkpoints');
-  if (!savedCheckpoints) {
-    logCheckpointOperation('init', 'Initializing default checkpoints');
-    localStorage.setItem('checkpoints', JSON.stringify(DEFAULT_CHECKPOINTS));
-    return DEFAULT_CHECKPOINTS;
-  }
-  const parsedCheckpoints = JSON.parse(savedCheckpoints);
-  logCheckpointOperation('get', parsedCheckpoints);
-  return parsedCheckpoints;
-};
-
-export const completeCheckpoint = (checkpointNumber: number): void => {
-  logCheckpointOperation('complete-start', { checkpointNumber });
-  
-  const currentCheckpoints = getCheckpoints();
-  const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
-  
-  // Validate checkpoint number
-  if (![1, 2, 3].includes(checkpointNumber)) {
-    logCheckpointOperation('error', 'Invalid checkpoint number');
-    return;
-  }
-
-  // Check completion conditions
-  const canComplete = 
-    checkpointNumber === 1 ||
-    (checkpointNumber === 2 && currentCheckpoints.checkpoint1) ||
-    (checkpointNumber === 3 && currentCheckpoints.checkpoint1 && currentCheckpoints.checkpoint2);
-
-  if (!canComplete) {
-    logCheckpointOperation('error', 'Cannot complete checkpoint - prerequisites not met');
-    return;
-  }
-
-  const updatedCheckpoints = {
-    ...currentCheckpoints,
-    [checkpointKey]: true
+export const getCheckpoints = async (): Promise<CheckpointStatus> => {
+  const checkpoints = await storage.getCheckpoints();
+  return checkpoints || {
+    checkpoint1: false,
+    checkpoint2: false,
+    checkpoint3: false,
   };
-  
+};
+
+export const completeCheckpoint = async (checkpointNumber: number): Promise<boolean> => {
   try {
-    localStorage.setItem('checkpoints', JSON.stringify(updatedCheckpoints));
-    logCheckpointOperation('complete-success', updatedCheckpoints);
-    window.dispatchEvent(new Event('checkpointsUpdated'));
+    const currentCheckpoints = await getCheckpoints();
+    
+    // Validate checkpoint number and prerequisites
+    if (![1, 2, 3].includes(checkpointNumber)) return false;
+    if (checkpointNumber === 2 && !currentCheckpoints.checkpoint1) return false;
+    if (checkpointNumber === 3 && (!currentCheckpoints.checkpoint1 || !currentCheckpoints.checkpoint2)) return false;
+
+    const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+    const updatedCheckpoints = {
+      ...currentCheckpoints,
+      [checkpointKey]: true,
+    };
+
+    return await storage.setCheckpoints(updatedCheckpoints);
   } catch (error) {
-    logCheckpointOperation('error', error);
+    console.error('Error completing checkpoint:', error);
+    return false;
   }
 };
