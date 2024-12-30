@@ -1,14 +1,15 @@
 /*
-  # Add delayed key deletion trigger
+  # Update key deletion trigger with delay
   
   1. Changes
-    - Creates a trigger function with 10-second delay before deleting expired keys
-    - Adds trigger to automatically delete expired keys after delay
-    - Updates clean_expired_keys function to include delay
+    - Add 10-second delay before deleting expired keys
+    - Update trigger function to include delay
+    - Update manual cleanup function to include delay
   
-  2. Security
-    - No RLS changes needed
-    - Functions execute with invoker's privileges
+  2. Details
+    - Uses pg_sleep(10) to add a 10-second delay
+    - Maintains existing functionality but adds delay
+    - Applies to both trigger and manual cleanup
 */
 
 -- Drop existing trigger if it exists
