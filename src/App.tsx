@@ -4,7 +4,6 @@ import { KeyDisplay } from './components/KeyDisplay';
 import { CheckpointButton } from './components/CheckpointButton';
 import { generateKey } from './utils/keyGeneration';
 import { getCheckpointUrl } from './utils/checkpointUrls';
-import { verifyCheckpoint } from './utils/checkpointVerification';
 import type { CheckpointStatus, Key } from './types';
 
 function App() {
@@ -17,13 +16,20 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Load checkpoints from localStorage on mount
   useEffect(() => {
     const savedCheckpoints = localStorage.getItem('checkpoints');
     if (savedCheckpoints) {
-      setCheckpoints(JSON.parse(savedCheckpoints));
+      try {
+        const parsed = JSON.parse(savedCheckpoints);
+        setCheckpoints(parsed);
+      } catch (e) {
+        console.error('Error parsing saved checkpoints:', e);
+      }
     }
   }, []);
 
+  // Save checkpoints to localStorage whenever they change
   useEffect(() => {
     localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
   }, [checkpoints]);
@@ -37,47 +43,33 @@ function App() {
 
   const handleLinkvertiseClick = async () => {
     const currentCheckpoint = getCurrentCheckpoint();
-    const checkpointUrl = getCheckpointUrl(currentCheckpoint);
-    
-    if (!checkpoints[`checkpoint${currentCheckpoint}` as keyof CheckpointStatus]) {
+    try {
+      const checkpointUrl = await getCheckpointUrl(currentCheckpoint);
       window.open(checkpointUrl, '_blank');
-      setIsProcessing(true);
-
-      // Start polling for verification
-      const pollInterval = setInterval(async () => {
-        const isVerified = await verifyCheckpoint(currentCheckpoint);
-        
-        if (isVerified) {
-          clearInterval(pollInterval);
-          setIsProcessing(false);
-          
-          const checkpointKey = `checkpoint${currentCheckpoint}` as keyof CheckpointStatus;
-          const newCheckpoints = { ...checkpoints, [checkpointKey]: true };
-          setCheckpoints(newCheckpoints);
-
-          // Check if all checkpoints are complete
-          if (Object.values(newCheckpoints).every(status => status)) {
-            try {
-              const key = await generateKey();
-              setGeneratedKey(key);
-              localStorage.removeItem('checkpoints');
-            } catch (error) {
-              if (error instanceof Error) {
-                setError(error.message);
-              } else {
-                setError('Error generating key');
-              }
-              console.error('Error generating key:', error);
-            }
+      
+      // Update checkpoint status immediately for testing
+      // In production, this should be handled by the verification endpoint
+      const checkpointKey = `checkpoint${currentCheckpoint}` as keyof CheckpointStatus;
+      const newCheckpoints = { ...checkpoints, [checkpointKey]: true };
+      setCheckpoints(newCheckpoints);
+      
+      // Check if all checkpoints are complete
+      if (Object.values(newCheckpoints).every(status => status)) {
+        try {
+          const key = await generateKey();
+          setGeneratedKey(key);
+        } catch (error) {
+          if (error instanceof Error) {
+            setError(error.message);
+          } else {
+            setError('Error generating key');
           }
+          console.error('Error generating key:', error);
         }
-      }, 5000); // Poll every 5 seconds
-
-      // Cleanup interval after 10 minutes
-      setTimeout(() => {
-        clearInterval(pollInterval);
-        setIsProcessing(false);
-      }, 600000);
+      }
+    } catch (error) {
+      console.error('Error handling checkpoint:', error);
+      setError('Error processing checkpoint');
     }
   };
 
