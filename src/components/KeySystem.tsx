@@ -3,13 +3,20 @@ import { Shield } from 'lucide-react';
 import { KeyDisplay } from './KeyDisplay';
 import { CheckpointButton } from './CheckpointButton';
 import { generateKey } from '../utils/keyGeneration';
-import { getExistingValidKey, startKeyValidityCheck } from '../utils/keyManagement';
+import {
+  getExistingValidKey,
+  startKeyValidityCheck,
+} from '../utils/keyManagement';
 import { getCheckpointUrl } from '../utils/checkpointUrls';
 import { getCheckpoints } from '../utils/checkpointManagement';
 import type { CheckpointStatus, Key } from '../types';
 
 export function KeySystem() {
-  const [checkpoints, setCheckpoints] = useState<CheckpointStatus>(getCheckpoints());
+  const [checkpoints, setCheckpoints] = useState<CheckpointStatus>({
+    checkpoint1: false,
+    checkpoint2: false,
+    checkpoint3: false
+  });
   const [generatedKey, setGeneratedKey] = useState<Key | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,7 +29,8 @@ export function KeySystem() {
         if (existingKey) {
           setGeneratedKey(existingKey);
         }
-        setCheckpoints(getCheckpoints());
+        const currentCheckpoints = await getCheckpoints();
+        setCheckpoints(currentCheckpoints);
       } catch (e) {
         console.error('Error initializing system:', e);
       } finally {
@@ -36,8 +44,9 @@ export function KeySystem() {
     const cleanup = startKeyValidityCheck();
 
     // Listen for checkpoint updates
-    const handleCheckpointUpdate = () => {
-      setCheckpoints(getCheckpoints());
+    const handleCheckpointUpdate = async () => {
+      const currentCheckpoints = await getCheckpoints();
+      setCheckpoints(currentCheckpoints);
     };
 
     window.addEventListener('checkpointsUpdated', handleCheckpointUpdate);
@@ -59,6 +68,7 @@ export function KeySystem() {
     const currentCheckpoint = getCurrentCheckpoint();
     try {
       setIsProcessing(true);
+      setError(null);
       const checkpointUrl = await getCheckpointUrl(currentCheckpoint);
       window.open(checkpointUrl, '_blank');
     } catch (error) {
@@ -70,7 +80,11 @@ export function KeySystem() {
   };
 
   const handleGenerateKey = async () => {
-    if (!checkpoints.checkpoint1 || !checkpoints.checkpoint2 || !checkpoints.checkpoint3) {
+    if (
+      !checkpoints.checkpoint1 ||
+      !checkpoints.checkpoint2 ||
+      !checkpoints.checkpoint3
+    ) {
       setError('Please complete all checkpoints first');
       return;
     }
@@ -98,7 +112,10 @@ export function KeySystem() {
   }
 
   const currentCheckpoint = getCurrentCheckpoint();
-  const allCheckpointsCompleted = checkpoints.checkpoint1 && checkpoints.checkpoint2 && checkpoints.checkpoint3;
+  const allCheckpointsCompleted =
+    checkpoints.checkpoint1 &&
+    checkpoints.checkpoint2 &&
+    checkpoints.checkpoint3;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
