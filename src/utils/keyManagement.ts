@@ -45,7 +45,7 @@ export const startKeyValidityCheck = () => {
 
   // Initial check
   checkKeyValidity();
-  
+
   // Check every minute
   const intervalId = setInterval(checkKeyValidity, 60000);
   return () => clearInterval(intervalId);
