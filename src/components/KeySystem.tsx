@@ -3,8 +3,9 @@ import { Shield } from 'lucide-react';
 import { KeyDisplay } from './KeyDisplay';
 import { CheckpointButton } from './CheckpointButton';
 import { generateKey } from '../utils/keyGeneration';
-import { getExistingValidKey } from '../utils/keyManagement';
+import { getExistingValidKey, startKeyValidityCheck } from '../utils/keyManagement';
 import { getCheckpointUrl } from '../utils/checkpointUrls';
+import { getCheckpoints } from '../utils/checkpointManagement';
 import type { CheckpointStatus, Key } from '../types';
 
 export function KeySystem() {
@@ -28,11 +29,8 @@ export function KeySystem() {
         }
 
         // Load saved checkpoints
-        const savedCheckpoints = localStorage.getItem('checkpoints');
-        if (savedCheckpoints) {
-          const parsed = JSON.parse(savedCheckpoints);
-          setCheckpoints(parsed);
-        }
+        const savedCheckpoints = getCheckpoints();
+        setCheckpoints(savedCheckpoints);
       } catch (e) {
         console.error('Error initializing system:', e);
       } finally {
@@ -42,6 +40,9 @@ export function KeySystem() {
 
     initializeSystem();
 
+    // Start key validity check
+    const cleanup = startKeyValidityCheck();
+
     // Add storage event listener
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'checkpoints' && e.newValue) {
@@ -50,7 +51,10 @@ export function KeySystem() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      cleanup();
+    };
   }, []);
 
   const getCurrentCheckpoint = () => {
