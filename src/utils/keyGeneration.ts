@@ -1,12 +1,13 @@
 import { v4 as uuidv4 } from 'uuid';
-import { addHours } from 'date-fns';
+import { addSeconds } from 'date-fns';
 import { supabase } from '../config/supabase';
 import { getHWID } from './hwid';
 
 export const generateKey = async () => {
   const key = uuidv4();
   const now = new Date();
-  const expiresAt = addHours(now, 24);
+  // Set expiration to 30 seconds from now for testing
+  const expiresAt = addSeconds(now, 30);
   const hwid = getHWID();
 
   // Check if there's an existing valid key for this HWID
