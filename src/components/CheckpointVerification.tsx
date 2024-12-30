@@ -16,15 +16,24 @@ export function CheckpointVerification() {
           checkpoint3: false,
         };
 
-        // Update the current checkpoint
-        const checkpointKey = `checkpoint${number}` as keyof typeof checkpoints;
-        checkpoints[checkpointKey] = true;
+        // Validate checkpoint number
+        if (number && ['1', '2', '3'].includes(number)) {
+          // Update the current checkpoint
+          const checkpointKey = `checkpoint${number}` as keyof typeof checkpoints;
+          
+          // Only update if previous checkpoints are completed
+          if (number === '1' || 
+              (number === '2' && checkpoints.checkpoint1) || 
+              (number === '3' && checkpoints.checkpoint1 && checkpoints.checkpoint2)) {
+            checkpoints[checkpointKey] = true;
+            
+            // Save updated checkpoints
+            localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
+          }
+        }
 
-        // Save updated checkpoints
-        localStorage.setItem('checkpoints', JSON.stringify(checkpoints));
-
-        // Redirect back to main page
-        navigate('/');
+        // Redirect back to main page after a short delay
+        setTimeout(() => navigate('/'), 1500);
       } catch (error) {
         console.error('Error completing checkpoint:', error);
       }
