@@ -1,31 +1,22 @@
 import { supabase } from '../config/supabase';
 
-export const deleteExpiredKey = async (keyId: string): Promise<void> => {
+export const deleteExpiredKey = async (keyId: string): Promise<boolean> => {
   try {
-    // First invalidate the key
-    const { error: updateError } = await supabase
-      .from('keys')
-      .update({ is_valid: false })
-      .eq('id', keyId);
-
-    if (updateError) {
-      console.error('Error invalidating key:', updateError);
-      return;
-    }
-
-    // Wait 2 seconds before deletion
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Delete the key
-    const { error: deleteError } = await supabase
+    // Delete the key directly
+    const { error } = await supabase
       .from('keys')
       .delete()
-      .eq('id', keyId);
+      .eq('id', keyId)
+      .eq('is_valid', false); // Only delete if already marked invalid
 
-    if (deleteError) {
-      console.error('Error deleting key:', deleteError);
+    if (error) {
+      console.error('Error deleting key:', error);
+      return false;
     }
+
+    return true;
   } catch (error) {
-    console.error('Error handling expired key:', error);
+    console.error('Error deleting expired key:', error);
+    return false;
   }
 };
