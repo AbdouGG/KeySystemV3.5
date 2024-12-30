@@ -7,34 +7,41 @@ export const checkKeyExpiration = async (): Promise<boolean> => {
   const now = new Date().toISOString();
 
   try {
-    const { data, error } = await supabase
+    // Get all keys for this HWID, ordered by creation date
+    const { data: allKeys, error: keysError } = await supabase
       .from('keys')
       .select('*')
       .eq('hwid', hwid)
-      .eq('is_valid', true)
-      .gte('expires_at', now)
-      .single();
+      .order('created_at', { ascending: false });
 
-    // Only reset checkpoints if we had a valid key before and it's now expired
-    if ((error || !data) && localStorage.getItem('had_valid_key') === 'true') {
+    if (keysError) throw keysError;
+
+    // Find the most recent valid key
+    const mostRecentValidKey = allKeys?.find(key => 
+      key.is_valid && new Date(key.expires_at) > new Date()
+    );
+
+    // Find the most recent expired key
+    const mostRecentExpiredKey = allKeys?.find(key =>
+      key.is_valid && new Date(key.expires_at) <= new Date()
+    );
+
+    // If we have no valid key but we have an expired key, reset checkpoints
+    if (!mostRecentValidKey && mostRecentExpiredKey) {
       resetCheckpoints();
       localStorage.removeItem('had_valid_key');
       return true;
     }
 
     // If we have a valid key, mark it
-    if (data) {
+    if (mostRecentValidKey) {
       localStorage.setItem('had_valid_key', 'true');
+      return false;
     }
 
     return false;
   } catch (error) {
     console.error('Error checking key expiration:', error);
-    // Only reset if we had a valid key before
-    if (localStorage.getItem('had_valid_key') === 'true') {
-      resetCheckpoints();
-      localStorage.removeItem('had_valid_key');
-    }
-    return true;
+    return false;
   }
 };

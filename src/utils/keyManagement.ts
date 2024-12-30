@@ -25,9 +25,8 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       .single();
 
     if (error) {
-      // Only reset if it's not a "no results" error
       if (error.code !== 'PGRST116') {
-        resetCheckpoints();
+        console.error('Error fetching key:', error);
       }
       return null;
     }
@@ -35,8 +34,6 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
     return data;
   } catch (error) {
     console.error('Error fetching existing key:', error);
-    // Only reset on actual errors
-    resetCheckpoints();
     return null;
   }
 };
@@ -46,6 +43,9 @@ export const startKeyValidityCheck = () => {
     await checkKeyExpiration();
   };
 
+  // Initial check
+  checkKeyValidity();
+  
   // Check every minute
   const intervalId = setInterval(checkKeyValidity, 60000);
   return () => clearInterval(intervalId);
