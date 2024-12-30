@@ -19,8 +19,10 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       .single();
 
     if (error) {
-      // If no valid key exists, reset checkpoints
-      resetCheckpoints();
+      // Only reset checkpoints if there's a real error, not just no results
+      if (error.code !== 'PGRST116') { // PGRST116 is the "no results" error code
+        resetCheckpoints();
+      }
       return null;
     }
 
@@ -33,7 +35,10 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
     return data;
   } catch (error) {
     console.error('Error fetching existing key:', error);
-    resetCheckpoints();
+    // Only reset checkpoints on actual errors
+    if (error && (error as any).code !== 'PGRST116') {
+      resetCheckpoints();
+    }
     return null;
   }
 };
@@ -52,12 +57,20 @@ export const startKeyValidityCheck = () => {
         .eq('is_valid', true)
         .gte('expires_at', now);
 
-      if (error || !data || data.length === 0) {
+      // Only reset if we had a valid key before and now it's invalid
+      if ((error || !data || data.length === 0) && localStorage.getItem('had_valid_key') === 'true') {
         resetCheckpoints();
+        localStorage.removeItem('had_valid_key');
+      } else if (data && data.length > 0) {
+        localStorage.setItem('had_valid_key', 'true');
       }
     } catch (error) {
       console.error('Error checking key validity:', error);
-      resetCheckpoints();
+      // Only reset on actual errors if we had a valid key before
+      if (localStorage.getItem('had_valid_key') === 'true') {
+        resetCheckpoints();
+        localStorage.removeItem('had_valid_key');
+      }
     }
   };
 
