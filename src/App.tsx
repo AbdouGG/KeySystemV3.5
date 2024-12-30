@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { KeySystem } from './components/KeySystem';
 import { CheckpointVerification } from './components/CheckpointVerification';
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
