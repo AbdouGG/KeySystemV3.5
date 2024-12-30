@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import { getHWID } from './hwid';
 import { resetCheckpoints } from './checkpointManagement';
 import { checkKeyExpiration } from './keyExpiration';
+import { cleanExpiredKeys } from './keyCleanup';
 import type { Key } from '../types';
 
 export const getExistingValidKey = async (): Promise<Key | null> => {
@@ -41,6 +42,7 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
 export const startKeyValidityCheck = () => {
   const checkKeyValidity = async () => {
     await checkKeyExpiration();
+    await cleanExpiredKeys(); // Add periodic cleanup
   };
 
   // Initial check
