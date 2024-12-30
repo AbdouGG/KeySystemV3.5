@@ -1,7 +1,30 @@
 import { supabase } from '../config/supabase';
 import { getHWID } from './hwid';
-import { resetCheckpoints } from './checkpointManagement';
+import { resetCheckpoints, getCheckpoints } from './checkpointManagement';
 import type { Key } from '../types';
+
+// New function to handle checkpoint persistence
+const handleCheckpointPersistence = async (hwid: string) => {
+  try {
+    const { data: persistedData } = await supabase
+      .from('checkpoint_progress')
+      .select('*')
+      .eq('hwid', hwid)
+      .single();
+
+    if (persistedData) {
+      // Restore checkpoints from database
+      localStorage.setItem('checkpoints', JSON.stringify({
+        checkpoint1: persistedData.checkpoint1,
+        checkpoint2: persistedData.checkpoint2,
+        checkpoint3: persistedData.checkpoint3
+      }));
+      window.dispatchEvent(new Event('checkpointsUpdated'));
+    }
+  } catch (error) {
+    console.error('Error handling checkpoint persistence:', error);
+  }
+};
 
 export const getExistingValidKey = async (): Promise<Key | null> => {
   try {
@@ -19,36 +42,43 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       .single();
 
     if (error) {
-      // Only reset checkpoints if there's a real error, not just no results
-      if (error.code !== 'PGRST116') { // PGRST116 is the "no results" error code
-        resetCheckpoints();
+      if (error.code !== 'PGRST116') {
+        await handleCheckpointPersistence(hwid);
       }
       return null;
     }
 
-    // Check if the key is expired
     if (new Date(data.expires_at) <= new Date()) {
-      resetCheckpoints();
+      await handleCheckpointPersistence(hwid);
       return null;
     }
 
     return data;
   } catch (error) {
     console.error('Error fetching existing key:', error);
-    // Only reset checkpoints on actual errors
-    if (error && (error as any).code !== 'PGRST116') {
-      resetCheckpoints();
-    }
     return null;
   }
 };
 
-// Add a function to check key validity periodically
 export const startKeyValidityCheck = () => {
   const checkKeyValidity = async () => {
     try {
       const hwid = getHWID();
       const now = new Date().toISOString();
+      const currentCheckpoints = getCheckpoints();
+
+      // Persist current checkpoints
+      await supabase
+        .from('checkpoint_progress')
+        .upsert({
+          hwid,
+          checkpoint1: currentCheckpoints.checkpoint1,
+          checkpoint2: currentCheckpoints.checkpoint2,
+          checkpoint3: currentCheckpoints.checkpoint3,
+          updated_at: now
+        }, {
+          onConflict: 'hwid'
+        });
 
       const { data, error } = await supabase
         .from('keys')
@@ -57,24 +87,14 @@ export const startKeyValidityCheck = () => {
         .eq('is_valid', true)
         .gte('expires_at', now);
 
-      // Only reset if we had a valid key before and now it's invalid
-      if ((error || !data || data.length === 0) && localStorage.getItem('had_valid_key') === 'true') {
-        resetCheckpoints();
-        localStorage.removeItem('had_valid_key');
-      } else if (data && data.length > 0) {
-        localStorage.setItem('had_valid_key', 'true');
+      if (error || !data || data.length === 0) {
+        await handleCheckpointPersistence(hwid);
       }
     } catch (error) {
       console.error('Error checking key validity:', error);
-      // Only reset on actual errors if we had a valid key before
-      if (localStorage.getItem('had_valid_key') === 'true') {
-        resetCheckpoints();
-        localStorage.removeItem('had_valid_key');
-      }
     }
   };
 
-  // Check every minute
   const intervalId = setInterval(checkKeyValidity, 60000);
   return () => clearInterval(intervalId);
 };
