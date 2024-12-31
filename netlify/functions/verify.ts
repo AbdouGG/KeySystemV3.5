@@ -1,6 +1,5 @@
 import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { v4 as uuidv4 } from 'uuid';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
@@ -21,7 +20,28 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Check for rate limiting
+    // Check for existing valid token
+    const { data: existingToken } = await supabase
+      .from('verification_tokens')
+      .select('*')
+      .eq('hwid', hwid)
+      .eq('checkpoint_number', checkpointNumber)
+      .eq('used', false)
+      .gte('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    // If there's a valid token, use it
+    if (existingToken) {
+      return {
+        statusCode: 302,
+        headers: {
+          Location: `/checkpoint/${checkpointNumber}?token=${encodeURIComponent(existingToken.token)}`,
+        },
+        body: '',
+      };
+    }
+
+    // Check rate limiting
     const { count } = await supabase
       .from('verification_tokens')
       .select('*', { count: 'exact', head: true })
@@ -36,14 +56,13 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // Generate a verification token with additional security measures
+    // Generate token using HWID and checkpoint
     const timestamp = Date.now();
-    const randomId = uuidv4();
     const token = Buffer.from(
-      `${hwid}-${checkpointNumber}-${timestamp}-${randomId}`
+      `${hwid}-${checkpointNumber}-${timestamp}`
     ).toString('base64');
 
-    // Store the token with a shorter expiration
+    // Store the token
     const { error } = await supabase.from('verification_tokens').insert([
       {
         token,
@@ -56,7 +75,6 @@ export const handler: Handler = async (event) => {
 
     if (error) throw error;
 
-    // Redirect to the checkpoint verification page with the token
     return {
       statusCode: 302,
       headers: {
@@ -65,10 +83,10 @@ export const handler: Handler = async (event) => {
       body: '',
     };
   } catch (error) {
-    console.error('Error generating verification token:', error);
+    console.error('Error handling verification:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to generate verification token' }),
+      body: JSON.stringify({ error: 'Failed to process verification' }),
     };
   }
 };
