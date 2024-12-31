@@ -7,8 +7,8 @@ import type { Key } from '../types';
 
 export const getExistingValidKey = async (): Promise<Key | null> => {
   try {
-    const isExpired = await checkKeyExpiration();
-    if (isExpired) {
+    const isInvalid = await checkKeyExpiration();
+    if (isInvalid) {
       return null;
     }
 
@@ -29,24 +29,19 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       if (error.code !== 'PGRST116') {
         console.error('Error fetching key:', error);
       }
-      resetCheckpoints(); // Reset checkpoints if no valid key is found
       return null;
     }
 
     return data;
   } catch (error) {
     console.error('Error fetching existing key:', error);
-    resetCheckpoints(); // Reset checkpoints on error
     return null;
   }
 };
 
 export const startKeyValidityCheck = () => {
   const checkKeyValidity = async () => {
-    const isExpired = await checkKeyExpiration();
-    if (isExpired) {
-      resetCheckpoints(); // Reset checkpoints when key becomes invalid
-    }
+    await checkKeyExpiration();
     await cleanExpiredKeys();
   };
 
