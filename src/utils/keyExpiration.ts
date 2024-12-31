@@ -1,16 +1,16 @@
 import { supabase } from '../config/supabase';
 import { resetCheckpoints } from './checkpointManagement';
-import { getHWID } from './hwid';
+import { getUserId } from './userId';
 
 export const checkKeyExpiration = async (): Promise<boolean> => {
-  const hwid = getHWID();
+  const userId = await getUserId();
 
   try {
-    // Check for any keys associated with this HWID
+    // Check for any keys associated with this user ID
     const { data: keys, error } = await supabase
       .from('keys')
       .select('*')
-      .eq('hwid', hwid);
+      .eq('user_id', userId);
 
     if (error) throw error;
 

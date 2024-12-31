@@ -1,5 +1,5 @@
 import { supabase } from '../config/supabase';
-import { getHWID } from './hwid';
+import { getUserId } from './userId';
 import { resetCheckpoints } from './checkpointManagement';
 import { checkKeyExpiration } from './keyExpiration';
 import { cleanExpiredKeys } from './keyCleanup';
@@ -12,43 +12,24 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       return null;
     }
 
+    const userId = await getUserId();
     const now = new Date().toISOString();
 
-    // First try to get a key with matching HWID
-    const { data: hwidKey, error: hwidError } = await supabase
+    // Get key for this user
+    const { data: userKey, error } = await supabase
       .from('keys')
       .select('*')
-      .eq('hwid', getHWID())
+      .eq('user_id', userId)
       .eq('is_valid', true)
       .gte('expires_at', now)
       .maybeSingle();
 
-    if (!hwidError && hwidKey) {
-      return hwidKey;
+    if (error) {
+      console.error('Error fetching key:', error);
+      return null;
     }
 
-    // Then try to get a key with empty HWID
-    const { data: emptyHwidKey, error: emptyError } = await supabase
-      .from('keys')
-      .select('*')
-      .eq('hwid', '')
-      .eq('is_valid', true)
-      .gte('expires_at', now)
-      .maybeSingle();
-
-    if (!emptyError && emptyHwidKey) {
-      // Update the HWID
-      const { error: updateError } = await supabase
-        .from('keys')
-        .update({ hwid: getHWID() })
-        .eq('id', emptyHwidKey.id);
-
-      if (!updateError) {
-        return { ...emptyHwidKey, hwid: getHWID() };
-      }
-    }
-
-    return null;
+    return userKey;
   } catch (error) {
     console.error('Error fetching existing key:', error);
     return null;

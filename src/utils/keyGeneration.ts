@@ -1,20 +1,21 @@
 import { v4 as uuidv4 } from 'uuid';
 import { addHours } from 'date-fns';
 import { supabase } from '../config/supabase';
-import { getHWID } from './hwid';
+import { getUserId } from './userId';
 
 export const generateKey = async () => {
   const key = uuidv4();
   const now = new Date();
   const expiresAt = addHours(now, 24);
+  const userId = await getUserId();
 
-  // Create new key with empty HWID
+  // Create new key with user ID
   const { data, error } = await supabase
     .from('keys')
     .insert([
       {
         key,
-        hwid: '', // Set empty HWID initially
+        user_id: userId,
         created_at: now.toISOString(),
         expires_at: expiresAt.toISOString(),
         is_valid: true
