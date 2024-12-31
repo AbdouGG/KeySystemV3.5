@@ -20,22 +20,38 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    // Generate a verification token
-    const timestamp = Date.now();
-    const token = Buffer.from(`${hwid}-${checkpointNumber}-${timestamp}`).toString('base64');
-
-    // Store the token in Supabase
-    const { error } = await supabase
+    // Check for rate limiting
+    const { count } = await supabase
       .from('verification_tokens')
-      .insert([
-        {
-          token,
-          hwid,
-          checkpoint_number: checkpointNumber,
-          expires_at: new Date(timestamp + 5 * 60 * 1000), // 5 minutes expiry
-          used: false
-        }
-      ]);
+      .select('*', { count: 'exact', head: true })
+      .eq('hwid', hwid)
+      .eq('checkpoint_number', checkpointNumber)
+      .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+
+    if (count && count >= 3) {
+      return {
+        statusCode: 429,
+        body: JSON.stringify({ error: 'Too many verification attempts. Please wait 5 minutes.' }),
+      };
+    }
+
+    // Generate a verification token with additional security measures
+    const timestamp = Date.now();
+    const randomBytes = Buffer.from(crypto.randomBytes(16)).toString('base64');
+    const token = Buffer.from(
+      `${hwid}-${checkpointNumber}-${timestamp}-${randomBytes}`
+    ).toString('base64');
+
+    // Store the token with a shorter expiration
+    const { error } = await supabase.from('verification_tokens').insert([
+      {
+        token,
+        hwid,
+        checkpoint_number: checkpointNumber,
+        expires_at: new Date(timestamp + 2 * 60 * 1000), // 2 minutes expiry
+        used: false,
+      },
+    ]);
 
     if (error) throw error;
 
