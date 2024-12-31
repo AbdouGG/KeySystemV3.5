@@ -12,7 +12,11 @@ import { getCheckpoints } from '../utils/checkpointManagement';
 import type { CheckpointStatus, Key } from '../types';
 
 export function KeySystem() {
-  const [checkpoints, setCheckpoints] = useState<CheckpointStatus>(getCheckpoints());
+  const [checkpoints, setCheckpoints] = useState<CheckpointStatus>({
+    checkpoint1: false,
+    checkpoint2: false,
+    checkpoint3: false
+  });
   const [generatedKey, setGeneratedKey] = useState<Key | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -25,7 +29,7 @@ export function KeySystem() {
         if (existingKey) {
           setGeneratedKey(existingKey);
         }
-        const currentCheckpoints = getCheckpoints();
+        const currentCheckpoints = await getCheckpoints();
         setCheckpoints(currentCheckpoints);
       } catch (e) {
         console.error('Error initializing system:', e);
@@ -36,12 +40,10 @@ export function KeySystem() {
 
     initializeSystem();
 
-    // Start key validity check
     const cleanup = startKeyValidityCheck();
 
-    // Listen for checkpoint updates
-    const handleCheckpointUpdate = () => {
-      const currentCheckpoints = getCheckpoints();
+    const handleCheckpointUpdate = async () => {
+      const currentCheckpoints = await getCheckpoints();
       setCheckpoints(currentCheckpoints);
     };
 
