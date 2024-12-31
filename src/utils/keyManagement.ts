@@ -29,20 +29,25 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       if (error.code !== 'PGRST116') {
         console.error('Error fetching key:', error);
       }
+      resetCheckpoints(); // Reset checkpoints if no valid key is found
       return null;
     }
 
     return data;
   } catch (error) {
     console.error('Error fetching existing key:', error);
+    resetCheckpoints(); // Reset checkpoints on error
     return null;
   }
 };
 
 export const startKeyValidityCheck = () => {
   const checkKeyValidity = async () => {
-    await checkKeyExpiration();
-    await cleanExpiredKeys(); // Add periodic cleanup
+    const isExpired = await checkKeyExpiration();
+    if (isExpired) {
+      resetCheckpoints(); // Reset checkpoints when key becomes invalid
+    }
+    await cleanExpiredKeys();
   };
 
   // Initial check
