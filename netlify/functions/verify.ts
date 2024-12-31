@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
@@ -37,9 +38,9 @@ export const handler: Handler = async (event) => {
 
     // Generate a verification token with additional security measures
     const timestamp = Date.now();
-    const randomBytes = Buffer.from(crypto.randomBytes(16)).toString('base64');
+    const randomId = uuidv4();
     const token = Buffer.from(
-      `${hwid}-${checkpointNumber}-${timestamp}-${randomBytes}`
+      `${hwid}-${checkpointNumber}-${timestamp}-${randomId}`
     ).toString('base64');
 
     // Store the token with a shorter expiration
