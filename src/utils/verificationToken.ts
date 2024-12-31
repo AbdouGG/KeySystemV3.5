@@ -1,43 +1,31 @@
 import { supabase } from '../config/supabase';
-import { getHWID } from './hwid';
-import { v4 as uuidv4 } from 'uuid';
+import { getUserId } from './userId';
 
-export const generateVerificationToken = async (
+export const verifyToken = async (
+  token: string,
   checkpointNumber: number
-): Promise<string> => {
-  const hwid = getHWID();
-  const timestamp = Date.now();
-  // Add more entropy to the token
-  const randomString = uuidv4();
-  const token = Buffer.from(`${hwid}-${checkpointNumber}-${timestamp}-${randomString}`).toString('base64');
-
+): Promise<boolean> => {
   try {
-    // Check for recent token generations to prevent spam
-    const { count } = await supabase
+    const { data, error } = await supabase
       .from('verification_tokens')
-      .select('*', { count: 'exact', head: true })
-      .eq('hwid', hwid)
+      .select('*')
+      .eq('token', token)
       .eq('checkpoint_number', checkpointNumber)
-      .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+      .eq('used', false)
+      .gte('expires_at', new Date().toISOString())
+      .single();
 
-    if (count && count >= 3) {
-      throw new Error('Too many verification attempts. Please wait 5 minutes.');
-    }
+    if (error || !data) return false;
 
-    const { error } = await supabase.from('verification_tokens').insert([
-      {
-        token,
-        hwid,
-        checkpoint_number: checkpointNumber,
-        expires_at: new Date(timestamp + 2 * 60 * 1000), // 2 minutes expiry
-        used: false,
-      },
-    ]);
+    // Mark token as used
+    await supabase
+      .from('verification_tokens')
+      .update({ used: true })
+      .eq('token', token);
 
-    if (error) throw error;
-    return token;
+    return true;
   } catch (error) {
-    console.error('Error generating verification token:', error);
-    throw new Error('Failed to generate verification token');
+    console.error('Error verifying token:', error);
+    return false;
   }
 };

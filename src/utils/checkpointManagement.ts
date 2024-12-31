@@ -97,3 +97,51 @@ export const getCheckpoints = async (): Promise<CheckpointStatus> => {
     };
   }
 };
+
+export const completeCheckpoint = async (
+  checkpointNumber: number,
+  token: string
+): Promise<void> => {
+  const userId = await getUserId();
+
+  try {
+    // Verify token first
+    const isValidToken = await verifyToken(token, checkpointNumber);
+    if (!isValidToken) {
+      throw new Error('Invalid or expired verification token');
+    }
+
+    // Get current checkpoints state
+    const currentCheckpoints = await getCheckpoints();
+
+    // Verify prerequisites
+    if (
+      (checkpointNumber === 2 && !currentCheckpoints.checkpoint1) ||
+      (checkpointNumber === 3 &&
+        (!currentCheckpoints.checkpoint1 || !currentCheckpoints.checkpoint2))
+    ) {
+      throw new Error('Previous checkpoints must be completed first');
+    }
+
+    const checkpointKey = `checkpoint${checkpointNumber}` as keyof CheckpointStatus;
+
+    const { error } = await supabase.from('user_checkpoints').upsert({
+      user_id: userId,
+      [checkpointKey]: true,
+      last_verification: new Date().toISOString(),
+    });
+
+    if (error) throw error;
+
+    // Verify the update was successful
+    const updatedCheckpoints = await getCheckpoints();
+    if (!updatedCheckpoints[checkpointKey]) {
+      throw new Error('Failed to update checkpoint status');
+    }
+
+    window.dispatchEvent(new Event('checkpointsUpdated'));
+  } catch (error) {
+    console.error('Error completing checkpoint:', error);
+    throw error;
+  }
+};
