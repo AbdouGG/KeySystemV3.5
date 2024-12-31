@@ -6,18 +6,23 @@ export const checkKeyExpiration = async (): Promise<boolean> => {
   const hwid = getHWID();
 
   try {
-    // Only check for invalid keys (is_valid = false)
+    // Check for any keys associated with this HWID
     const { data: keys, error } = await supabase
       .from('keys')
       .select('*')
-      .eq('hwid', hwid)
-      .eq('is_valid', false);
+      .eq('hwid', hwid);
 
     if (error) throw error;
 
-    // Reset checkpoints only if we found an invalid key
-    if (keys && keys.length > 0) {
-      resetCheckpoints();
+    // Find any invalid or expired keys
+    const now = new Date();
+    const hasInvalidKey = keys?.some(key => 
+      !key.is_valid || new Date(key.expires_at) < now
+    );
+
+    // Reset checkpoints if we found an invalid key
+    if (hasInvalidKey) {
+      await resetCheckpoints();
       localStorage.removeItem('had_valid_key');
       return true;
     }
