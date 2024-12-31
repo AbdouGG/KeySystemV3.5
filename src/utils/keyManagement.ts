@@ -12,27 +12,43 @@ export const getExistingValidKey = async (): Promise<Key | null> => {
       return null;
     }
 
-    const hwid = getHWID();
     const now = new Date().toISOString();
 
-    const { data, error } = await supabase
+    // First try to get a key with matching HWID
+    const { data: hwidKey, error: hwidError } = await supabase
       .from('keys')
       .select('*')
-      .eq('hwid', hwid)
+      .eq('hwid', getHWID())
       .eq('is_valid', true)
       .gte('expires_at', now)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      if (error.code !== 'PGRST116') {
-        console.error('Error fetching key:', error);
-      }
-      return null;
+    if (!hwidError && hwidKey) {
+      return hwidKey;
     }
 
-    return data;
+    // Then try to get a key with empty HWID
+    const { data: emptyHwidKey, error: emptyError } = await supabase
+      .from('keys')
+      .select('*')
+      .eq('hwid', '')
+      .eq('is_valid', true)
+      .gte('expires_at', now)
+      .maybeSingle();
+
+    if (!emptyError && emptyHwidKey) {
+      // Update the HWID
+      const { error: updateError } = await supabase
+        .from('keys')
+        .update({ hwid: getHWID() })
+        .eq('id', emptyHwidKey.id);
+
+      if (!updateError) {
+        return { ...emptyHwidKey, hwid: getHWID() };
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error('Error fetching existing key:', error);
     return null;
