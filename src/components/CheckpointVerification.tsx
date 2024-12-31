@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { completeCheckpoint, getCheckpoints } from '../utils/checkpointManagement';
 
 export function CheckpointVerification() {
   const { number } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(true);
@@ -12,6 +13,13 @@ export function CheckpointVerification() {
     const verifyCheckpoint = async () => {
       if (!number || !['1', '2', '3'].includes(number)) {
         setError('Invalid checkpoint number');
+        setTimeout(() => navigate('/', { replace: true }), 2000);
+        return;
+      }
+
+      const token = searchParams.get('token');
+      if (!token) {
+        setError('Invalid verification token');
         setTimeout(() => navigate('/', { replace: true }), 2000);
         return;
       }
@@ -32,24 +40,15 @@ export function CheckpointVerification() {
           return;
         }
 
-        await completeCheckpoint(checkpointNumber);
+        await completeCheckpoint(checkpointNumber, token);
         
-        // Verify completion
-        const updatedCheckpoints = await getCheckpoints();
-        const checkpointKey = `checkpoint${checkpointNumber}` as keyof typeof updatedCheckpoints;
-
-        if (updatedCheckpoints[checkpointKey]) {
-          // Success - redirect after a short delay
-          setTimeout(() => {
-            navigate('/', { replace: true });
-          }, 1500);
-        } else {
-          setError('Failed to complete checkpoint');
-          setTimeout(() => navigate('/', { replace: true }), 2000);
-        }
-      } catch (err) {
+        // Success - redirect after a short delay
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 1500);
+      } catch (err: any) {
         console.error('Error during checkpoint verification:', err);
-        setError('An error occurred during verification');
+        setError(err.message || 'An error occurred during verification');
         setTimeout(() => navigate('/', { replace: true }), 2000);
       } finally {
         setIsVerifying(false);
@@ -57,7 +56,7 @@ export function CheckpointVerification() {
     };
 
     verifyCheckpoint();
-  }, [number, navigate]);
+  }, [number, navigate, searchParams]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">

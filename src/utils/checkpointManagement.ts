@@ -38,7 +38,6 @@ export const getCheckpoints = async (): Promise<CheckpointStatus> => {
     if (error) throw error;
 
     if (!data) {
-      // Create new entry if none exists
       const { error: insertError } = await supabase.from('user_checkpoints').insert([
         {
           hwid,
@@ -73,10 +72,42 @@ export const getCheckpoints = async (): Promise<CheckpointStatus> => {
   }
 };
 
-export const completeCheckpoint = async (checkpointNumber: number): Promise<void> => {
+export const verifyToken = async (token: string, checkpointNumber: number): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('verification_tokens')
+      .select('*')
+      .eq('token', token)
+      .eq('checkpoint_number', checkpointNumber)
+      .eq('used', false)
+      .gte('expires_at', new Date().toISOString())
+      .single();
+
+    if (error || !data) return false;
+
+    // Mark token as used
+    await supabase
+      .from('verification_tokens')
+      .update({ used: true })
+      .eq('token', token);
+
+    return true;
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    return false;
+  }
+};
+
+export const completeCheckpoint = async (checkpointNumber: number, token: string): Promise<void> => {
   const hwid = getHWID();
 
   try {
+    // Verify token first
+    const isValidToken = await verifyToken(token, checkpointNumber);
+    if (!isValidToken) {
+      throw new Error('Invalid or expired verification token');
+    }
+
     await supabase.rpc('set_hwid', { hwid });
 
     // Get current checkpoints state
